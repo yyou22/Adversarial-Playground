@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- The above 3 meta tags *must* come first in the head; any other head content must come *after* these tags -->
+    <meta name="description" content="">
+    <meta name="author" content="Andrew Norton (QData group at UVA)">
+    <!-- <link rel="icon" href="../../favicon.ico"> -->
+
+    <title>{{ title }} - Adversarial Playground</title>
+
+    <!-- Bootstrap core CSS -->
+    <link href="{{ url_for('static', filename='bs/css/bootstrap.min.css')}}" rel="stylesheet">
+
+    <!-- Custom styles for this template -->
+    <link href="{{ url_for('static', filename='custom.css') }}" rel="stylesheet">
+
+    <!-- Fontawesome for GitHub icons -->
+    <link href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" rel="stylesheet"/>
+
+  </head>
+
+  <body>
+
+    <nav class="navbar navbar-inverse navbar-fixed-top">
+      <div class="container">
+        <div class="navbar-header">
+          <!--<button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar">
+            <span class="sr-only">Toggle navigation</span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+          </button>
+          -->
+          <a class="navbar-brand" href="index">Adversarial Playground</a>
+        </div>
+
+        <div id="navbar" class="collapse navbar-collapse">
+          <ul class="nav navbar-nav">
+            <li><a href="jsma">Jacobian Saliency Map</a></li>
+            <li><a href="fjsma">Fast Jacobian Saliency Map</a></li>
+            <!-- <li><a href="fjsma">Fast Jacobian Saliency Map</a></li> -->
+            <li><a href="l_inf">Fast Gradient Sign</a></li>
+          </ul>
+        </div><!--/.nav-collapse -->
+      </div>
+    </nav>
+
+    <div class="container">
+
+      <div class="starter-template">
+        <h1>Adversarial DNN Playground</h1>
+      </div>
+      <div class="row">
+        <div class="col-md-8">
+          <div class="panel panel-default">
+              <div class="panel-heading">
+                <h2 class = "panel-title">About</h2>
+              </div>
+              <div class="panel-body">
+                <p>
+                In recent years, Deep Neural Networks have become an essential tool for many machine learning tasks, especially image classification.  However, this has given rise to the study of <em>adversarial samples</em>--carefully crafted inputs for a neural network that result in an incorrect classification.
+                </p>
+                <p>
+                In the spirit of the TensorFlow Playground, we present the Adversarial Playground: a web-based visualization tool to assist users in understanding the differences between common adversarial machine learning techniques.  Upon launch, the application starts a lightweight Python webserver hosting a collection of pages related to the visualization.  The server-based nature allows remote hosting, but the webserver may be hosted on any computer running TensorFlow.
+                </p>
+
+                <h3>Usage</h3>
+                <p>
+                We allow multiple types of adversarial attacks, accessible through the top navigation bar:
+                  <ul>
+                    <li>Jacobian Saliency Map Approach (JSMA)</li>
+                    <li>Fast Jacobian Saliency Map Apriori (FJSMA) </li>
+                    <li>Fast Gradient Sign</li>
+                  </ul>
+
+                The first two approaches implement an L<sup>0</sup>-norm method based on the work in <em>The Limitations of Deep Learning in Adversarial Settings</em> by Papernot et al.<sup><a href="https://arxiv.org/abs/1511.07528" target="_blank">[1]</a></sup>; the first is a direct implementation of their work, while the latter is our own contribution -- an approximation to their algorithm that runs much faster, suitable for a web-based tool.  The third evasion approach is an L<sup>&infin;</sup>-based attack, following the common Fast Gradient Sign method.  This implementation was directly adapted from the Cleverhans toolkit, also by Papernot et al<sup><a href="https://arxiv.org/abs/1610.00768" target="_blank">[2]</a></sup>.
+                </p>
+
+                <p>
+                  Once on the page for each evasion algorithm, you may select a seed image, adjust the attacking power, and select a target class (for targeted methods).  Once you have done so, the evasion algorithm is performed on-demand in real time, and the resulting graphic (and classification likelihoods) are displayed.
+                </p>
+
+                <h3>About the Attacks</h3>
+                <h4>Jacobian Saliency Map Approach (JSMA)</h4>
+                The core idea of this evasion algorithm is to modify pixels from the seed image that produce the greatest impact on the classification of the image.  This is done through the use of a <em>saliency map</em> -- a tool originally used for visualization.  After using the saliency map to determine the most impactful pixels, the adversary iteratively modifies pixels that <em>increase</em> the target classification likelihood while <em>suppressing</em> the likelihoods for all other classifications.  This process is repeated until either the modified image is in the target class, or the L<sup>0</sup> distance between the modified image and seed image exceeds a specified threshold.   For more information on the details of the algorithm, we refer the reader to Papernot et al<sup><a href="https://arxiv.org/abs/1511.07528" target="_blank">[1]</a></sup> mentioned above.
+
+                The modification to each pixel may take many forms; in this application, the one we apply is to set selected pixels to complete black.  (This, and its converse of setting selected pixels to pure white, is a relatively common implementation choice.)  Since we are minimizing the L<sup>0</sup> distance, there are very few pixels that are changed in this approach.  A typical example is below.
+
+                <img src="{{ url_for('static', filename='jsma-attack.png') }}" class="img-responsive" alt="Example seed and adversarial sample" />
+
+                <h4>Fast Jacobian Saliency Map Apriori (FJSMA)</h4>
+                A disadvatage of the JSMA is that each iteration requires a combinatorial search of pairs of pixels.  A complete slows down the process on the server-side, which can lead to latency for users of this webapp.  We approximated the JSMA approach by greedily selecting a small proportion of the pairs of pixels.  This enables a faster response time from the server and less waiting for end-users, while still maintaining a comparable evasion rate.
+
+                <h4>Fast Gradient Sign</h4>
+                In this demonstration, we use an untargeted form of the Fast Gradient Sign method.  The core idea of this approach is to compute the gradient of the classifier to find the direction which will change the classification the most, then adjust the entire image by some small amount in that direction.  This is good for minimizing the L<sup>&infin;</sup> norm, but leads to the appearance of random noise covering the entire image.  A typical example is as below.
+                <img src="{{ url_for('static', filename='fgs-attack.png') }}" class="img-responsive" alt="Example seed and adversarial sample" />
+
+
+                <h3>Design Choices</h3>
+                There are a variety of design choices we made that are relevant to the user; please refer to <a href="https://arxiv.org/abs/1706.01763" target="_blank">our paper</a> for more detailed information.
+
+                <h4>Seed Images</h4>
+                We made an arbitrary selection of 10 seed images, one from each class 0-9, which the user may select to start the attack.  We also included a misclassified sample from the "9" class that is resilient to feature squeezing (the sample from mentioned in Xu, et al's paper<sup><a href="https://arxiv.org/abs/1704.01155" target="_blank">[3]</a></sup>).  If the application has been configured locally, the selection of samples may be altered by running a simple Python script.  (See the <a href="https://github.com/QData/AdversarialDNN-Playground/blob/master/README.md">GitHub README</a> for more technical information.)
+
+                <h4>Client-side rendering</h4>
+                To reduce latency experienced by the user, we've utilized the Plotly.JS JavaScript library to render the images and plots on the client side.  However, this does require that you have JavaScript enabled to experience the full features of this software.  Please turn off NoScript or similar browser extensions to view the visualizations.
+              </div>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="panel panel-default">
+            <div class="panel-heading">
+              <h3 class = "panel-title">QData Lab</h3>
+            </div>
+            <div class="panel-body">
+              <p>
+                <a href="https://www.cs.virginia.edu/yanjun/">Homepage</a>
+              </p>
+            </div>
+          </div>
+          <div class="panel panel-default">
+            <div class="panel-heading">
+              <h3 class = "panel-title">Source code <i class="fa fa-github" aria-hidden="true"></i></h3>
+            </div>
+            <div class="panel-body">
+              <p>
+                The entire project is open-source; code is on <a href="https://github.com/QData/AdversarialDNN-Playground">GitHub</a>.
+              </p>
+            </div>
+          </div>
+          <div class="panel panel-default">
+            <div class="panel-heading">
+              <h3 class = "panel-title">arXiv</h3>
+            </div>
+            <div class="panel-body">
+              <p>
+                The accompanying paper for this project is on <a href="https://arxiv.org/abs/1706.01763">arXiv(I)</a> and <a href="https://arxiv.org/abs/1708.00807">arXiv(II)</a>.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div><!-- /.container -->
+
+
+    <!-- Bootstrap core JavaScript
+    ================================================== -->
+    <!-- Placed at the end of the document so the pages load faster -->
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
+
+    <script>window.jQuery || document.write('<script src="../../assets/js/vendor/jquery.min.js"><\/script>')</script>
+    <script src="{{ url_for('static', filename='bs/js/bootstrap.min.js') }}"></script>
+    <!-- IE10 viewport hack for Surface/desktop Windows 8 bug -->
+    <!--<script src="{{ url_for('static', filename='bs/js/ie10-viewport-bug-workaround.js')}}"></script>-->
+
+    <script>
+      (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+          (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+          m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+        })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+      ga('create', 'UA-100959649-1', 'auto');
+      ga('send', 'pageview');
+    </script>
+  </body>
+</html>

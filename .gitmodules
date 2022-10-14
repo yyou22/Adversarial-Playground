@@ -1,0 +1,6 @@
+[submodule "webapp/static/image-picker"]
+	path = webapp/static/image-picker
+	url = https://github.com/rvera/image-picker.git
+[submodule "experiments/cleverhans"]
+	path = experiments/cleverhans
+	url = https://github.com/tensorflow/cleverhans.git
